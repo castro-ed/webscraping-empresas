@@ -19,8 +19,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q');
   const location = searchParams.get('location') || 'Goiânia';
+  const limit = parseInt(searchParams.get('limit') || '60', 10);
 
-  console.log(`[API] Recebida nova requisição: q="${query}", location="${location}"`);
+  console.log(`[API] Recebida nova requisição: q="${query}", location="${location}", limit=${limit}`);
 
   if (!query || query.trim().length === 0) {
     console.warn('[API] Requisição rejeitada: parâmetro "q" ausente.');
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
   const cleanLocation = location.trim();
   
   // Gera chave única para o cache
-  const cacheKey = `${cleanQuery.toLowerCase()}|${cleanLocation.toLowerCase()}`;
+  const cacheKey = `${cleanQuery.toLowerCase()}|${cleanLocation.toLowerCase()}|${limit}`;
   const now = Date.now();
 
   // Verifica cache
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const results = await scrapeGoogleMaps(cleanQuery, cleanLocation);
+    const results = await scrapeGoogleMaps(cleanQuery, cleanLocation, limit);
 
     // Salva no cache
     console.log(`[API] Salvando resultado no cache para chave: "${cacheKey}"`);

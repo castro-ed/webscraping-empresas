@@ -20,6 +20,8 @@ export default function Home() {
     hasSearched,
     setQuery,
     setLocation,
+    limit,
+    setLimit,
     search,
   } = useSearch();
 
@@ -35,7 +37,7 @@ export default function Home() {
           <div className="mb-8 text-center animate-fade-in-up">
             <h2 className="text-2xl font-bold tracking-tight text-brown-800 sm:text-3xl">
               Encontre empresas para{' '}
-              <span className="bg-gradient-to-r from-gold-500 to-gold-700 bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-gold-500 to-gold-700 bg-clip-text text-transparent">
                 prospectar
               </span>
             </h2>
@@ -50,9 +52,11 @@ export default function Home() {
             <SearchForm
               query={query}
               location={location}
+              limit={limit}
               loading={loading}
               onQueryChange={setQuery}
               onLocationChange={setLocation}
+              onLimitChange={setLimit}
               onSearch={search}
             />
           </div>
@@ -66,7 +70,7 @@ export default function Home() {
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 20 20"
                     fill="currentColor"
-                    className="h-5 w-5 flex-shrink-0 text-red-500"
+                    className="h-5 w-5 shrink-0 text-red-500"
                   >
                     <path
                       fillRule="evenodd"

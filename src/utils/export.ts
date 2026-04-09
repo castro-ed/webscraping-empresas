@@ -10,6 +10,7 @@ function buildWorkbook(data: Company[]): XLSX.WorkBook {
     'Nome da Empresa': company.name,
     'Endereço': company.address,
     'Telefone': company.phone,
+    'E-mail': company.email || 'N/A',
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -20,6 +21,7 @@ function buildWorkbook(data: Company[]): XLSX.WorkBook {
     { wch: 40 },
     { wch: 50 },
     { wch: 20 },
+    { wch: 30 },
   ];
 
   const workbook = XLSX.utils.book_new();

@@ -24,10 +24,10 @@ async function connectBrowser(): Promise<Browser> {
 }
 
 /**
- * Faz scroll na lista de resultados do Google Maps para carregar mais itens.
+ * Faz scroll na lista de resultados do Google Maps para carregar mais itens até atingir a meta.
  */
-async function scrollResultsList(page: Page, maxScrolls = 5): Promise<void> {
-  console.log(`[Scraper] Iniciando scroll (max: ${maxScrolls})...`);
+async function scrollResultsList(page: Page, targetCount: number): Promise<void> {
+  console.log(`[Scraper] Iniciando scroll dinâmico para atingir ${targetCount} resultados...`);
   const feedSelector = 'div[role="feed"]';
 
   try {
@@ -37,8 +37,30 @@ async function scrollResultsList(page: Page, maxScrolls = 5): Promise<void> {
     return;
   }
 
-  for (let i = 0; i < maxScrolls; i++) {
-    console.log(`[Scraper] Scroll ${i + 1}/${maxScrolls}`);
+  let lastCount = 0;
+  let stagnantCycles = 0;
+  const maxStagnantCycles = 5;
+
+  while (true) {
+    const currentCount = await page.locator('div[role="feed"] > div > div > a').count();
+    console.log(`[Scraper] Resultados carregados: ${currentCount}/${targetCount}`);
+
+    if (currentCount >= targetCount) {
+      console.log('[Scraper] Limite de resultados atingido.');
+      break;
+    }
+
+    if (currentCount === lastCount) {
+      stagnantCycles++;
+      if (stagnantCycles >= maxStagnantCycles) {
+        console.log('[Scraper] Fim da lista ou carregamento travado.');
+        break;
+      }
+    } else {
+      stagnantCycles = 0;
+      lastCount = currentCount;
+    }
+
     await page.evaluate((sel) => {
       const feed = document.querySelector(sel);
       if (feed) {
@@ -46,13 +68,14 @@ async function scrollResultsList(page: Page, maxScrolls = 5): Promise<void> {
       }
     }, feedSelector);
 
-    await page.waitForTimeout(1500);
+    // Espera dinâmica baseada no volume para evitar bloqueios
+    const waitTime = currentCount > 200 ? 2000 : 1500;
+    await page.waitForTimeout(waitTime);
 
     const endOfList = await page.evaluate((sel) => {
       const feed = document.querySelector(sel);
       if (!feed) return true;
-      const lastChild = feed.lastElementChild;
-      return lastChild?.textContent?.includes('Você chegou ao final da lista') ?? false;
+      return feed.textContent?.includes('Você chegou ao final da lista') ?? false;
     }, feedSelector);
 
     if (endOfList) {
@@ -68,7 +91,7 @@ async function scrollResultsList(page: Page, maxScrolls = 5): Promise<void> {
 async function extractCompanies(page: Page): Promise<Company[]> {
   console.log('[Scraper] Extraindo dados das empresas...');
   const results = await page.evaluate(() => {
-    const items: Array<{ name: string; address: string; phone: string }> = [];
+    const items: Array<{ name: string; address: string; phone: string; email?: string; website?: string }> = [];
     const cards = document.querySelectorAll('div[role="feed"] > div > div > a');
 
     cards.forEach((card) => {
@@ -77,23 +100,31 @@ async function extractCompanies(page: Page): Promise<Company[]> {
 
       const ariaLabel = card.getAttribute('aria-label') || '';
       const textContent = container.textContent || '';
+      
+      // Busca o link do Website no card — heurística aprimorada
+      const websiteLink = container.querySelector('a[data-item-id="authority"], a.lcr4fd, a[aria-label*="site"], a[aria-label*="Website"]');
+      const website = websiteLink ? (websiteLink as HTMLAnchorElement).href : undefined;
 
       // Extrai telefone — padrões brasileiros
       const phoneMatch = textContent.match(
         /\(?\d{2}\)?\s*\d{4,5}[-.\s]?\d{4}/
       );
 
-      // Extrai endereço — geralmente no texto após o nome
+      // Extrai e-mail se disponível no texto do card
+      const emailMatch = textContent.match(
+        /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/
+      );
+
+      // Extrai endereço
       const allText = container.querySelectorAll('div');
       let address = '';
       
       allText.forEach((div) => {
         const text = div.textContent?.trim() || '';
-        // Heurística: endereços contêm padrões como "R.", "Av.", "Rua", etc.
         if (
           !address &&
           (text.match(/\b(R\.|Rua|Av\.|Avenida|Al\.|Alameda|Praça|Rod\.|Rodovia|Setor|St\.|Qd\.|Quadra|Lt\.|Lote)/i) ||
-           text.match(/\d{5}-?\d{3}/)) && // CEP
+           text.match(/\d{5}-?\d{3}/)) &&
           text.length > 10 &&
           text.length < 200
         ) {
@@ -106,6 +137,8 @@ async function extractCompanies(page: Page): Promise<Company[]> {
           name: ariaLabel,
           address: address || 'N/A',
           phone: phoneMatch ? phoneMatch[0] : 'N/A',
+          email: emailMatch ? emailMatch[0] : 'N/A',
+          website: website || 'N/A',
         });
       }
     });
@@ -119,7 +152,48 @@ async function extractCompanies(page: Page): Promise<Company[]> {
     name: sanitize(r.name),
     address: formatAddress(r.address),
     phone: r.phone !== 'N/A' ? formatPhone(r.phone) : 'N/A',
+    email: r.email !== 'N/A' ? r.email?.toLowerCase() : 'N/A',
+    website: r.website || 'N/A',
   }));
+}
+
+/**
+ * Tenta encontrar um e-mail dentro do site oficial da empresa.
+ */
+async function findEmailInWebsite(browser: Browser, url: string): Promise<string | null> {
+  if (!url || url === 'N/A' || url.includes('google.com')) return null;
+
+  console.log(`[Scraper] Crawling website: ${url}`);
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  });
+
+  const page = await context.newPage();
+
+  // Otimização: bloqueia recursos pesados
+  await page.route('**/*', (route) => {
+    const type = route.request().resourceType();
+    if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
+      route.abort();
+    } else {
+      route.continue();
+    }
+  });
+
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 8000 });
+    const content = await page.content();
+    
+    // Regex de e-mail para crawling
+    const emailMatch = content.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    
+    return emailMatch ? emailMatch[0].toLowerCase() : null;
+  } catch (err) {
+    console.warn(`[Scraper] Falha ao acessar ${url}:`, (err as Error).message);
+    return null;
+  } finally {
+    await context.close();
+  }
 }
 
 /**
@@ -127,7 +201,8 @@ async function extractCompanies(page: Page): Promise<Company[]> {
  */
 export async function scrapeGoogleMaps(
   query: string,
-  location: string
+  location: string,
+  maxResults = 60
 ): Promise<Company[]> {
   console.log(`[Scraper] Iniciando busca: "${query}" em "${location}"`);
   const browser = await connectBrowser();
@@ -166,11 +241,63 @@ export async function scrapeGoogleMaps(
       // Sem popup de cookies
     }
 
-    // Scroll para carregar mais resultados
-    await scrollResultsList(page, 8);
+    // Scroll para carregar mais resultados dinamicamente
+    await scrollResultsList(page, maxResults);
 
-    // Extrai dados
-    const companies = await extractCompanies(page);
+    // Extrai dados iniciais (Mapa)
+    let companies = await extractCompanies(page);
+    console.log(`[Scraper] Mapas finalizados. Iniciando descoberta de e-mails em websites...`);
+
+    // Descoberta de e-mails via Websites (Passo 1: Revelar URLs se necessário)
+    console.log(`[Scraper] Iniciando revelação de sites e descoberta de e-mails...`);
+    
+    // NOVO: Lógica para clicar em itens que não têm Website no card e pegar do painel lateral
+    // Limitamos para performance se o volume for muito alto
+    const maxClicks = maxResults <= 100 ? companies.length : 100;
+
+    for (let i = 0; i < Math.min(companies.length, maxClicks); i++) {
+        const company = companies[i];
+        if (!company.website || company.website === 'N/A') {
+            console.log(`[Scraper] Revelando detalhes para: ${company.name}`);
+            try {
+                const card = page.locator('div[role="feed"] > div > div > a').nth(i);
+                await card.click();
+                await page.waitForTimeout(800); // Espera o painel carregar
+
+                const websiteLink = page.locator('a[data-item-id="authority"]').first();
+                if (await websiteLink.isVisible({ timeout: 2000 })) {
+                  const href = await websiteLink.getAttribute('href');
+                  if (href) {
+                    company.website = href;
+                    console.log(`[Scraper] Website encontrado no painel: ${href}`);
+                  }
+                }
+            } catch (err) {
+                console.warn(`[Scraper] Falha ao revelar website de ${company.name}`);
+            }
+        }
+    }
+
+    // Descoberta de e-mails via Websites (Passo 2: Crawling)
+    const companiesToCrawl = companies.filter(c => c.website && c.website !== 'N/A' && (!c.email || c.email === 'N/A'));
+    
+    if (companiesToCrawl.length > 0) {
+      console.log(`[Scraper] Processando ${companiesToCrawl.length} websites em paralelo...`);
+      
+      const batchSize = 10;
+      for (let i = 0; i < companiesToCrawl.length; i += batchSize) {
+        const batch = companiesToCrawl.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (company) => {
+          if (company.website) {
+            const email = await findEmailInWebsite(browser, company.website);
+            if (email) {
+              company.email = email;
+            }
+          }
+        }));
+      }
+    }
+
     console.log(`[Scraper] Extração finalizada. Total de empresas: ${companies.length}`);
 
     await context.close();

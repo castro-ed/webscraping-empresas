@@ -13,6 +13,8 @@ interface UseSearchReturn {
   hasSearched: boolean;
   setQuery: (q: string) => void;
   setLocation: (l: string) => void;
+  limit: number;
+  setLimit: (l: number) => void;
   search: () => Promise<void>;
   clearResults: () => void;
 }
@@ -20,6 +22,7 @@ interface UseSearchReturn {
 export function useSearch(): UseSearchReturn {
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('Goiânia');
+  const [limit, setLimit] = useState(60);
   const [results, setResults] = useState<Company[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -40,6 +43,7 @@ export function useSearch(): UseSearchReturn {
       const params = new URLSearchParams({
         q: query.trim(),
         location: location.trim(),
+        limit: limit.toString(),
       });
 
       const response = await fetch(`/api/search?${params.toString()}`);
@@ -61,7 +65,7 @@ export function useSearch(): UseSearchReturn {
     } finally {
       setLoading(false);
     }
-  }, [query, location]);
+  }, [query, location, limit]);
 
   const clearResults = useCallback(() => {
     setResults([]);
@@ -80,6 +84,8 @@ export function useSearch(): UseSearchReturn {
     hasSearched,
     setQuery,
     setLocation,
+    limit,
+    setLimit,
     search,
     clearResults,
   };

@@ -5,18 +5,22 @@ import { FormEvent } from 'react';
 interface SearchFormProps {
   query: string;
   location: string;
+  limit: number;
   loading: boolean;
   onQueryChange: (q: string) => void;
   onLocationChange: (l: string) => void;
+  onLimitChange: (l: number) => void;
   onSearch: () => void;
 }
 
 export default function SearchForm({
   query,
   location,
+  limit,
   loading,
   onQueryChange,
   onLocationChange,
+  onLimitChange,
   onSearch,
 }: SearchFormProps) {
   const handleSubmit = (e: FormEvent) => {
@@ -28,7 +32,7 @@ export default function SearchForm({
     <form onSubmit={handleSubmit} className="w-full">
       <div className="overflow-hidden rounded-2xl border border-warmGray-200/60 bg-white shadow-xl shadow-brown-900/5 transition-all duration-300 hover:shadow-2xl hover:shadow-brown-900/10">
         {/* Title bar */}
-        <div className="border-b border-warmGray-100 bg-gradient-to-r from-warmGray-50 to-white px-6 py-4">
+        <div className="border-b border-warmGray-100 bg-linear-to-r from-warmGray-50 to-white px-6 py-4">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-brown-700">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -117,14 +121,52 @@ export default function SearchForm({
             </div>
           </div>
 
+          {/* Limit selector */}
+          <div className="group">
+            <label
+              htmlFor="search-limit"
+              className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-warmGray-500"
+            >
+              Quantidade de Resultados
+            </label>
+            <div className="relative">
+              <select
+                id="search-limit"
+                value={limit}
+                onChange={(e) => onLimitChange(Number(e.target.value))}
+                disabled={loading}
+                className="w-full appearance-none rounded-xl border border-warmGray-200 bg-warmGray-50/50 px-4 py-3.5 text-sm text-brown-800 transition-all duration-200 focus:border-gold-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-gold-400/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value={60}>60 resultados</option>
+                <option value={200}>200 resultados (Recomendado)</option>
+                <option value={500}>500 resultados</option>
+                <option value={800}>800 resultados (Máximo)</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-5 w-5 text-warmGray-300 transition-colors group-focus-within:text-gold-400"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
+
           {/* Submit button */}
           <button
             type="submit"
             disabled={loading || !query.trim()}
-            className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-gold-500 to-gold-600 px-6 py-3.5 text-sm font-semibold text-brown-900 shadow-lg shadow-gold-500/25 transition-all duration-300 hover:from-gold-400 hover:to-gold-500 hover:shadow-xl hover:shadow-gold-500/30 focus:outline-none focus:ring-4 focus:ring-gold-400/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-lg"
+            className="group relative w-full overflow-hidden rounded-xl bg-linear-to-r from-gold-500 to-gold-600 px-6 py-3.5 text-sm font-semibold text-brown-900 shadow-lg shadow-gold-500/25 transition-all duration-300 hover:from-gold-400 hover:to-gold-500 hover:shadow-xl hover:shadow-gold-500/30 focus:outline-none focus:ring-4 focus:ring-gold-400/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-lg"
           >
             {/* Shimmer effect */}
-            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+            <div className="absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
 
             <span className="relative flex items-center justify-center gap-2">
               {loading ? (

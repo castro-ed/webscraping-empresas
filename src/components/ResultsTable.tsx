@@ -40,8 +40,8 @@ export default function ResultsTable({
   // Sort results
   const sortedResults = useMemo(() => {
     const sorted = [...filteredResults].sort((a, b) => {
-      const aVal = a[sortConfig.key].toLowerCase();
-      const bVal = b[sortConfig.key].toLowerCase();
+      const aVal = (a[sortConfig.key] || '').toLowerCase();
+      const bVal = (b[sortConfig.key] || '').toLowerCase();
       if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
@@ -87,7 +87,7 @@ export default function ResultsTable({
   return (
     <div className="overflow-hidden rounded-2xl border border-warmGray-200/60 bg-white shadow-xl shadow-brown-900/5">
       {/* Table header with stats & filter */}
-      <div className="border-b border-warmGray-100 bg-gradient-to-r from-warmGray-50 to-white px-6 py-4">
+      <div className="border-b border-warmGray-100 bg-linear-to-r from-warmGray-50 to-white px-6 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-brown-700">
@@ -139,7 +139,7 @@ export default function ResultsTable({
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-warmGray-500">
                 #
               </th>
-              {(['name', 'address', 'phone'] as const).map((key) => (
+              {(['name', 'address', 'phone', 'email'] as const).map((key) => (
                 <th
                   key={key}
                   onClick={() => handleSort(key)}
@@ -149,6 +149,7 @@ export default function ResultsTable({
                     {key === 'name' && 'Empresa'}
                     {key === 'address' && 'Endereço'}
                     {key === 'phone' && 'Telefone'}
+                    {key === 'email' && 'E-mail'}
                     <SortIcon columnKey={key} />
                   </span>
                 </th>
@@ -180,6 +181,12 @@ export default function ResultsTable({
                       <path fillRule="evenodd" d="m3.855 7.286 1.067-.534a1 1 0 00.542-1.046l-.44-2.858A1 1 0 016.016 1.88l1.756.429a1 1 0 001.15-.49l1.358-2.55a1 1 0 011.763.009l1.34 2.562a1 1 0 001.16.48l1.747-.456a1 1 0 011.005.98l-.457 2.86a1 1 0 00.535 1.05l1.058.547a1 1 0 01.006 1.764l-1.074.55a1 1 0 00-.532 1.04l.457 2.857a1 1 0 01-1.008.98l-1.75-.456a1 1 0 00-1.15.49L12.87 16.12a1 1 0 01-1.766-.007l-1.34-2.562a1 1 0 00-1.16-.48l-1.747.456a1 1 0 01-1.005-.98l.457-2.86a1 1 0 00-.535-1.05l-1.058-.547a1 1 0 01-.006-1.764l.155-.08z" clipRule="evenodd" />
                     </svg>
                     {company.phone}
+                  </span>
+                </td>
+                {/*Coluna de E-mail */}
+                <td className="whitespace-nowrap px-6 py-4">
+                  <span className="text-sm text-warmGray-600">
+                    {company.email || 'N/A'}
                   </span>
                 </td>
               </tr>
