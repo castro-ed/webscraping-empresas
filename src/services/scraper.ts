@@ -203,7 +203,10 @@ export async function scrapeGoogleMaps(
   query: string,
   location: string,
   maxResults = 60
-): Promise<Company[]> {
+): Promise<{ companies: Company[]; isPartial: boolean }> {
+  const startTime = Date.now();
+  const TIME_LIMIT = 290000;
+  
   console.log(`[Scraper] Iniciando busca: "${query}" em "${location}"`);
   const browser = await connectBrowser();
 
@@ -244,6 +247,14 @@ export async function scrapeGoogleMaps(
     // Scroll para carregar mais resultados dinamicamente
     await scrollResultsList(page, maxResults);
 
+    // Verifica tempo após scroll
+    if (Date.now() - startTime > TIME_LIMIT) {
+      console.warn('[Scraper] Tempo limite atingido após scroll. Retornando dados parciais.');
+      const companies = await extractCompanies(page);
+      await context.close();
+      return { companies, isPartial: true };
+    }
+
     // Extrai dados iniciais (Mapa)
     let companies = await extractCompanies(page);
     console.log(`[Scraper] Mapas finalizados. Iniciando descoberta de e-mails em websites...`);
@@ -256,13 +267,21 @@ export async function scrapeGoogleMaps(
     const maxClicks = maxResults <= 100 ? companies.length : 100;
 
     for (let i = 0; i < Math.min(companies.length, maxClicks); i++) {
+        // Verifica tempo limite em cada iteração de "reveal"
+        if (Date.now() - startTime > TIME_LIMIT) {
+            console.warn('[Scraper] Tempo limite atingido durante reveal. Interrompendo e retornando o que foi coletado.');
+            await context.close();
+            return { companies, isPartial: true };
+        }
+
         const company = companies[i];
         if (!company.website || company.website === 'N/A') {
             console.log(`[Scraper] Revelando detalhes para: ${company.name}`);
             try {
                 const card = page.locator('div[role="feed"] > div > div > a').nth(i);
                 await card.click();
-                await page.waitForTimeout(800); // Espera o painel carregar
+                // Espera curta para animação
+                await page.waitForTimeout(500); 
 
                 const websiteLink = page.locator('a[data-item-id="authority"]').first();
                 if (await websiteLink.isVisible({ timeout: 2000 })) {
@@ -286,6 +305,13 @@ export async function scrapeGoogleMaps(
       
       const batchSize = 10;
       for (let i = 0; i < companiesToCrawl.length; i += batchSize) {
+        // Verifica tempo limite em cada lote de crawling
+        if (Date.now() - startTime > TIME_LIMIT) {
+            console.warn('[Scraper] Tempo limite atingido durante crawling. Interrompendo.');
+            await context.close();
+            return { companies, isPartial: true };
+        }
+
         const batch = companiesToCrawl.slice(i, i + batchSize);
         await Promise.all(batch.map(async (company) => {
           if (company.website) {
@@ -301,12 +327,12 @@ export async function scrapeGoogleMaps(
     console.log(`[Scraper] Extração finalizada. Total de empresas: ${companies.length}`);
 
     await context.close();
-    return companies;
+    return { companies, isPartial: false };
   } catch (error) {
     console.error('[Scraper] Erro fatal durante o processo:', error);
     throw error;
   } finally {
     console.log('[Scraper] Fechando browser...');
-    await browser.close();
+    if (browser) await browser.close();
   }
 }

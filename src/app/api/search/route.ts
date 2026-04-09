@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { scrapeGoogleMaps } from '@/services/scraper';
 import type { SearchResponse, Company } from '@/types';
 
-export const maxDuration = 60; // Vercel timeout
+export const maxDuration = 300;
 
 // Interface para o item do cache
 interface CacheItem {
@@ -59,20 +59,21 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const results = await scrapeGoogleMaps(cleanQuery, cleanLocation, limit);
+    const { companies, isPartial } = await scrapeGoogleMaps(cleanQuery, cleanLocation, limit);
 
     // Salva no cache
     console.log(`[API] Salvando resultado no cache para chave: "${cacheKey}"`);
     cache.set(cacheKey, {
-      data: results,
+      data: companies,
       timestamp: Date.now(),
     });
 
     const response: SearchResponse = {
-      results,
-      total: results.length,
+      results: companies,
+      total: companies.length,
       query: cleanQuery,
       location: cleanLocation,
+      isPartial,
     };
 
     console.log('[API] Retornando resposta de sucesso.');

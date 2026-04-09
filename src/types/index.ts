@@ -16,6 +16,7 @@ export interface SearchResponse {
   total: number;
   query: string;
   location: string;
+  isPartial?: boolean; // Indica se a busca foi interrompida por timeout
 }
 
 export type ExportFormat = "csv" | "xlsx";

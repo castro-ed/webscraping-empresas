@@ -15,6 +15,7 @@ interface UseSearchReturn {
   setLocation: (l: string) => void;
   limit: number;
   setLimit: (l: number) => void;
+  isPartial: boolean;
   search: () => Promise<void>;
   clearResults: () => void;
 }
@@ -28,6 +29,7 @@ export function useSearch(): UseSearchReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isPartial, setIsPartial] = useState(false);
 
   const search = useCallback(async () => {
     if (!query.trim()) {
@@ -56,6 +58,7 @@ export function useSearch(): UseSearchReturn {
       const data: SearchResponse = await response.json();
       setResults(data.results);
       setTotal(data.total);
+      setIsPartial(!!data.isPartial);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Erro inesperado. Tente novamente.';
@@ -86,6 +89,7 @@ export function useSearch(): UseSearchReturn {
     setLocation,
     limit,
     setLimit,
+    isPartial,
     search,
     clearResults,
   };

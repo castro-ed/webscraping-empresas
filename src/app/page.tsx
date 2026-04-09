@@ -22,6 +22,7 @@ export default function Home() {
     setLocation,
     limit,
     setLimit,
+    isPartial,
     search,
   } = useSearch();
 
@@ -105,6 +106,7 @@ export default function Home() {
                 total={total}
                 query={query}
                 location={location}
+                isPartial={isPartial}
               />
             </div>
           )}
